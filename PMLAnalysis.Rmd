@@ -1,0 +1,95 @@
+---
+title: "Practical Machine Learning project writeup"
+author: "Dinesh Kumar SRB"
+date: "Saturday, September 20, 2014"
+output: html_document
+---
+### Case Background:
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the [website here](http://groupware.les.inf.puc-rio.br/har) (see the section on the Weight Lifting Exercise Dataset).  
+
+### Project Goal:  
+The goal of the project is to predict the manner in which the enthusiasts did the exercise. This is the "classe" variable in the training set. We may use any of the other variables to predict with. We should create a report describing how the model is built, how we used cross validation, what we think the expected out of sample error is, and why we made the particular choices. We will also use the final prediction model to predict 20 different test cases.  
+
+### Analysis:
+#### Getting the data:
+- It is assumed that the [training dataset](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv) and [testing dataset](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv) are dowloaded from the respective links and saved in the working folder. Loading the given traning and testing dataset and replacing the empty cells and DIV into NA's.
+
+```{r, cache=TRUE}
+training <- read.csv("pml-training.csv", na.strings = c("NA", "", "#DIV/0!"))
+dim(training)
+testing <- read.csv("pml-testing.csv", na.strings = c("NA", "", "#DIV/0!"))
+dim(testing)
+```
+
+#### Cleaning the data:
+- Removing the NA's from both the traning and testing datasets and remove unwanted predictors to create a tidy training and testing datasets that can be used to bulid models.
+
+```{r, cache=TRUE}
+training<-training[,colSums(is.na(training)) == 0]
+testing<-testing[,colSums(is.na(testing)) == 0]
+training <- training[,-1:-6]
+testing <- testing[,-1:-6]
+```
+
+#### Cross Validation:
+- For cross validation the given traning dataset is split randomly into two dataset (70:30 split), one for traning and other for validating the model before applying to the final testing dataset of 20 cases.
+
+```{r, cache=TRUE}
+library (caret)
+inTrain<-createDataPartition(training$classe, p=0.7, list=FALSE)
+newTraining<-training[inTrain,]
+dimTrain <- dim(newTraining)
+newTesting<-training[-inTrain,]
+dimTest <- dim(newTesting)
+rm(training)
+```
+The dimensions of new training and testing dataset is reduced to size of the `r dimTrain` and `r dimTest` respectively
+
+####Building models:
+- Building a prediction model with classification tree on new training dataset and applied to new testing data set to check the out of sample error.
+
+```{r, cache=TRUE}
+modFit1 <- train(classe ~ . , method = "rpart", data=newTraining)
+prediction1 <- predict(modFit1, newdata=newTesting) 
+cm1<-confusionMatrix(prediction1, newTesting$classe)
+accuracy1 <- cm1$overall[1]
+```
+The overall accuracy of the tree model is `r accuracy1`. 
+
+- Building a prediction model with Random forest on new training dataset and applied to new testing data set to check the out of sample error.
+
+```{r, cache=TRUE}
+library(randomForest)
+modFit2 <- randomForest(classe ~ ., data=newTraining, importance=T, ntrees=10)
+prediction2 <- predict(modFit2, newdata=newTesting) 
+cm2<-confusionMatrix(prediction2, newTesting$classe)
+accuracy2 <- cm2$overall[1]
+```
+The overall accuracy of the random forest model is `r accuracy2`
+
+```{r, cache=TRUE}
+print(cm2)
+```
+
+#### Final Model selection and result prediction: 
+- Since random forest model is having high accuracy the given testing set is applied to random forest model modFit2 to predict the outcome of the 20 cases
+
+```{r, cache=TRUE}
+prediction3 <- predict(modFit2, newdata=testing)
+prediction3
+```
+#### Submission:
+- Following code is used to output the predicted result in separate file which is used to submit in second part of course assignment
+
+```{r, cache=TRUE}
+pml_write_files = function(x){
+        n = length(x)
+        for(i in 1:n){
+                filename = paste0("problem_id_",i,".txt")
+                write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+        }
+}
+pml_write_files(prediction3)
+```
+
+#### End of the assignment
